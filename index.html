@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html >
+<head>
+  <meta charset="UTF-8">
+  <title>Twitch Streamers</title>
+  
+  
+  <link rel='stylesheet prefetch' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css'>
+<link rel='stylesheet prefetch' href='https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css'>
+<link rel='stylesheet prefetch' href='https://fonts.googleapis.com/css?family=Gravitas+One'>
+<link rel='stylesheet prefetch' href='https://fonts.googleapis.com/css?family=Black+Ops+One'>
+<link rel='stylesheet prefetch' href='https://fonts.googleapis.com/css?family=Alegreya'>
+<link rel='stylesheet prefetch' href='https://code.jquery.com/ui/1.11.3/themes/smoothness/jquery-ui.css'>
+<link rel='stylesheet prefetch' href='https://cdn.jsdelivr.net/css-toggle-switch/latest/toggle-switch.css'>
+
+      <link rel="stylesheet" href="css/style.css">
+
+  
+</head>
+
+<body>
+  		<header class="site-header">
+			<div>
+				<img src="http://s.jtvnw.net/jtv_user_pictures/hosted_images/GlitchIcon_purple.png" class="twitch-logo" />
+				<span class="site-header-style">TWITCH STREAMERS</span>
+			</div>
+		</header>
+		<div id="button-holder">
+			<fieldset>
+			  <div class="switch-toggle well stream-status">
+			    <input id="all" name="view3" type="radio" checked>
+			    <label for="all" onclick="">View All</label>
+			
+			    <input id="online" name="view3" type="radio">
+			    <label for="online" onclick="">Online</label>
+			
+			    <input id="offline" name="view3" type="radio">
+			    <label for="offline" onclick="">Offline</label>
+			    
+				<input id="featured" name="view3" type="radio">
+			    <label for="featured" onclick="">Featured</label>
+			    <a class="btn btn-primary"></a>
+			  </div>
+			</fieldset>
+		</div>
+		<div class="row stream-input-div">
+			<input type="text" name="channel_name" id="channel_id" class="stream-input" placeholder="Enter Channel Name"> 
+			<span class="stream-btn" id="connect-id">Connect</span>
+		</div>
+			
+		<div id="search-result-div">
+			
+		</div>
+
+    	<div id="loading-div-background">
+		<div id="loading-div" class="ui-corner-all" >
+		      <img style="height:80px;margin:30px;" src="https://i.stack.imgur.com/FhHRx.gif" alt="Loading.."/>
+		      <h2 style="color:gray;font-weight:normal;">Please wait....</h2>
+		     </div>
+		</div>
+		<footer class="site-footer" id="footer-id">
+			
+		</footer>
+
+  		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+  		<script src="https://code.jquery.com/ui/1.11.3/jquery-ui.js"></script>
+  		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+		<script type="text/javascript">
+				var twitchApiUrl = "https://api.twitch.tv/kraken";
+				
+				/* $.getJSON('https://api.twitch.tv/kraken/streams/featured?callback=?', function(data) {
+				  console.log(data);
+				});
+					
+				$.getJSON('https://api.twitch.tv/kraken/streams/ESL_SC2?callback=?', function(data) {
+					  console.log(data);
+					});  */
+				var ONLINE_STATUS = "Online";
+				var OFFLINE_STATUS = "Offline";
+				var ACCOUNT_LOCKED_STATUS = "Account Closed";
+				var resultStreamArr = [];
+				var regularStreamersArr = ["brunofin", "ESL_SC2", "OgamingSC2", "cretetion", "freecodecamp", "storbeck", "habathcx", "RobotCaleb", "noobs2ninjas", "XXADAFAFAFAAFAFAF", "comster404"];
+				
+				for (var eachInd = 0; eachInd < regularStreamersArr.length; eachInd++) {
+					fetchStream(regularStreamersArr[eachInd]);
+				}
+
+				$(window).bind("load", function() {
+					showSearchArray();
+					
+					$('#all').click(function(eventObj) {
+						showSearchArray();
+					});
+					$('#online').click(function(eventObj) {
+						prepareNShowOnlineChannel();
+					});
+					$('#offline').click(function(eventObj) {
+						prepareNShowOffLineChannel();
+					});
+					$('#featured').click(function(eventObj) {
+						fetchFeaturedStreams();
+					});
+					
+					$('#connect-id').click(function(eventObj) {
+						getChannelInfo();
+					});
+					
+				});
+				
+				function getChannelInfo() {
+					
+					var streamName = document.getElementById("channel_id").value;
+					console.log("got cannel name :" + streamName);
+					if (streamName) {
+						$("#loading-div-background").show();
+						 $.getJSON(twitchApiUrl + '/streams/' + streamName + '?callback=?', function(data) {
+							    var queryChannelInfoArr = [];
+								var streamObj = prepareNGetStreamObject(data, streamName);
+								if (streamObj.status !== ONLINE_STATUS) {
+									$.getJSON(twitchApiUrl + '/channels/' + streamName + '?callback=?', function(channelData) {
+										var queryChannelInfoArr = [];
+										if (channelData.error) {
+											streamObj.logoImgUrl = "http://s.jtvnw.net/jtv_user_pictures/hosted_images/GlitchIcon_WhiteonPurple.png";
+										} else {
+											streamObj.logoImgUrl = channelData.logo;
+											streamObj.displayName = channelData.display_name;
+											streamObj.streaming = channelData.status;
+											streamObj.channelUrl = channelData.url;
+										}
+										queryChannelInfoArr.push(streamObj);
+										displayArrayContent(queryChannelInfoArr);
+										console.log("... inside call.");
+										console.log(queryChannelInfoArr);
+									 });
+								} else {
+									queryChannelInfoArr.push(streamObj);
+									displayArrayContent(queryChannelInfoArr);
+								}
+								
+								$("#loading-div-background").hide();
+							 });
+					}
+				}
+				/**
+				 * It fetches the featured (promoted) stream objects. Note that the number of promoted streams varies
+				 * from day to day, and there is no guarantee on how many streams will be promoted at a given time. 
+				 */
+				function fetchFeaturedStreams() {
+					$contentDiv = $("#search-result-div");
+					//contentDiv.innerHTML = "";
+					 $("#loading-div-background").show();
+					$.getJSON(twitchApiUrl + '/streams/featured?callback=?', function(data) {
+						var featuredStreamArr = [];
+						if (data.featured) {
+							var streamCount = data.featured.length;
+							for (var eachStrmInd = 0; eachStrmInd < streamCount; eachStrmInd++) {
+								featuredStreamArr.push(prepareNGetStreamObject(data.featured[eachStrmInd]));
+							}
+						} else if(data.error) {
+					 		
+					 		var streamError = new StreamError(data.error, data.message, data.status);
+					 		streamObj = new Stream("featured", null, "featured", null, null, null, streamError);
+					 		featuredStreamArr.push(streamObj)
+					 	}
+						$("#loading-div-background").hide();
+						displayArrayContent(featuredStreamArr);
+					});
+				}
+				/**
+				 * This function prepare the local Stream object by fetching the required information from server object.
+				 * @param {Object} serverDataObj - The object receieved after the server call.
+				 */
+				function prepareNGetStreamObject(serverDataObj, streamName) {
+					var streamObj = null;
+					var name = streamName;
+					var logoImg = null;
+					var displayName = streamName;
+					var status = OFFLINE_STATUS;
+					var streaming = null;
+					var viewersCount = 0;
+					var streamError = null;
+					var channelUrl = null;
+					
+				 	if (serverDataObj.stream) {
+						logoImg = serverDataObj.stream.channel.logo;
+						displayName = serverDataObj.stream.channel.display_name;
+						status = ONLINE_STATUS;
+						streaming = serverDataObj.stream.channel.status;
+						viewersCount = serverDataObj.stream.viewers;
+						channelUrl = serverDataObj.stream.channel.url;
+				 		
+				 	} else if(serverDataObj.error) {
+				 		if (serverDataObj.status === 422) {
+				 			status = ACCOUNT_LOCKED_STATUS;
+				 		} else {
+				 			status = serverDataObj.error;
+				 		}
+				 		streamError = new StreamError(serverDataObj.error, serverDataObj.message, serverDataObj.status);
+				 	}
+				 	
+				 	streamObj = new Stream(name, logoImg, displayName, status, streaming, viewersCount, streamError, channelUrl);
+				 	return streamObj;
+				}
+				/**
+				 * This functions fetches the Stream information and fill the resultStreamArr.
+				 * @param {string} streamName - The name of the Streaming channel (unique name).
+				 */
+				function fetchStream(streamName) {
+					 $.getJSON(twitchApiUrl + '/streams/' + streamName + '?callback=?', function(data) {
+						var streamObj = prepareNGetStreamObject(data, streamName);
+						if (streamObj.status !== ONLINE_STATUS) {
+							$.getJSON(twitchApiUrl + '/channels/' + streamName + '?callback=?', function(channelData) {
+								if (channelData.error) {
+									streamObj.logoImgUrl = "http://s.jtvnw.net/jtv_user_pictures/hosted_images/GlitchIcon_WhiteonPurple.png";
+								} else {
+									streamObj.logoImgUrl = channelData.logo;
+									streamObj.displayName = channelData.display_name;
+									streamObj.streaming = channelData.status;
+									streamObj.channelUrl = channelData.url;
+								}
+								resultStreamArr.push(streamObj);
+							 });
+						} else {
+							resultStreamArr.push(streamObj);
+						}
+					 });
+				}
+				/**
+				 * Gets the current Streams summary and display on the page.
+				 */
+				function currentStreamsSummary() {
+					$.getJSON(twitchApiStreamUrl + '/summary?callback=?', function(data) {
+						  console.log(data);
+				  });
+				}
+				/**
+				 * Basic Stream Object to store streams information.
+				 * @constructor
+				 * @param {string} name - The name of the Streaming channel (unique name).
+				 * @param {string} logoImg - The image url of the channel logo.
+				 * @param {string} displayName - The display Name of the channel.
+				 * @param {string} status - Status of the streaming (offline/online).
+				 * @param {string} streaming - The streaming information.
+				 * @param {int} viewersCount - Number of unsers currently viewing the channel.
+				 * @param {StreamError} streamError - The stream error object.
+				 * @param {string} channelUrl - Channel Url.
+				 */
+				function Stream(name, logoImg, displayName, status, streaming, viewersCount, streamError, channelUrl) {
+					this.name = name;
+					this.logoImgUrl = logoImg;
+					this.displayName = displayName;
+					this.status = status;
+					this.streaming = streaming;
+					this.viewersCount = viewersCount;
+					this.streamError = streamError
+					this.channelUrl = channelUrl
+					
+					this.isEqual = function(streamObj) {
+						var returnVal = false;
+						if (streamObj && streamObj.name) {
+							if (this.name === streamObj.name) {
+								returnVal = true;
+							}
+						}
+						return returnVal;
+					}
+					
+					this.isOnline = function() {
+				    	if(this.status === ONLINE_STATUS) {
+				    		return true;
+				    	} 
+				    	return false;
+				    }
+				    this.isOffline = function() {
+				    	if(this.status === OFFLINE_STATUS) {
+				    		return true;
+				    	} 
+				    	return false;
+				    }
+				}
+				 /**
+				  * Stream Error Object to store streams error information.
+				  * @constructor
+				  * @param {string} error - The error generated by the API Call.
+				  * @param {string} message - The error message for the given API call.
+				  * @param {string} status - The status code of the channel.
+				 */				
+				function StreamError(error, message, status) {
+					this.error = error;
+					this.message = message;
+					this.status = status;
+				}
+			
+			function prepareNShowOffLineChannel() {
+				var offlineArr = [];
+				if (resultStreamArr && resultStreamArr.length > 0) {
+					resultStreamArr.forEach(function(currentValue){
+						if (currentValue.isOffline()) {
+							offlineArr.push(currentValue);
+						}
+					}, offlineArr);
+				}
+				displayArrayContent(offlineArr);
+			}
+			function prepareNShowOnlineChannel() {
+				var onlineArr = [];
+				if (resultStreamArr && resultStreamArr.length > 0) {
+					resultStreamArr.forEach(function(currentValue){
+						if (currentValue.isOnline()) {
+							onlineArr.push(currentValue);
+						}
+					}, onlineArr);
+				}
+				displayArrayContent(onlineArr);
+			}
+			function showSearchArray()
+			{
+				displayArrayContent(resultStreamArr);
+			}
+			function displayArrayContent(contentArray) {
+				if (contentArray && contentArray.length > 0) {
+					var searchResultSize = contentArray.length;
+					console.log("the array count :" + searchResultSize);
+					var searchSrc = "<ul>";
+					var eachStreamObj = null;
+					var eachSearchListSrc = null;
+					var thumbnailImgSrc = null;
+
+					for (var searchIndex = 0; searchIndex < searchResultSize; searchIndex++) {
+						eachStreamObj = contentArray[searchIndex];
+						thumbnailImgSrc = "";
+						if(eachStreamObj.logoImgUrl) {
+							thumbnailImgSrc = " <img src='" + eachStreamObj.logoImgUrl + "' />";
+						}
+						eachSearchListSrc = "<li> ";
+						if (eachStreamObj.channelUrl) {
+							eachSearchListSrc += " <a href='" + (eachStreamObj.channelUrl) + "' target='_blank'>";
+						}
+						eachSearchListSrc += thumbnailImgSrc + 
+													"<h3>" + eachStreamObj.displayName + "</h3></a>" +
+													"<p>Status: " + eachStreamObj.status + "</p>";
+						if (eachStreamObj.status === ONLINE_STATUS) {
+							eachSearchListSrc += "<p>Streaming: " + eachStreamObj.streaming + "</p>" +
+												 "<p>Currently viewing:" + eachStreamObj.viewersCount;
+						}
+													
+						eachSearchListSrc +=" " +
+											"</li>";
+
+						searchSrc += eachSearchListSrc;
+					}
+					searchSrc += "</ul>"
+					var contentDiv = document.getElementById("search-result-div");
+					contentDiv.innerHTML = searchSrc;
+					var footerContainer = document.getElementById("footer-id");
+					footerContainer.innerHTML = "<div>Developed by <a href='https://www.linkedin.com/in/mohammad-sufiyan-al-yousufi-0279743a' target='_blank' style='font-size: inherit;''> Mohammad Sufiyan Al Yousufi </a>.<br>Contact information: <a href='mailto:mdsufyan2005@gmail.com' style='font-size: inherit; ''>mdsufyan2005@gmail.com</a><br>© 2016 AlySufiyan Software Development Labs </div>";
+				}
+				
+			}
+		</script>
+  <script src='https://code.jquery.com/jquery-2.2.4.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js'></script>
+<script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js'></script>
+
+  
+</body>
+</html>
